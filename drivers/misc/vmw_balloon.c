@@ -1365,6 +1365,7 @@ static void vmballoon_work(struct work_struct *work)
 	queue_delayed_work(system_freezable_wq,
 			   dwork, round_jiffies_relative(HZ));
 
+			   dwork, round_jiffies_relative(10*HZ));
 }
 
 /*
