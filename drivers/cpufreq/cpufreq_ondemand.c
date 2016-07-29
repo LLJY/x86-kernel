@@ -22,13 +22,13 @@
 
 /* On-demand governor macros */
 #if defined(CONFIG_ZEN_INTERACTIVE) && defined(CONFIG_SCHED_MUQSS)
-	#define DEF_FREQUENCY_UP_THRESHOLD	(45)
+	#define DEF_FREQUENCY_UP_THRESHOLD	(63)
 	#define MICRO_FREQUENCY_UP_THRESHOLD	(45)
 #elif defined(CONFIG_ZEN_INTERACTIVE)
 	#define DEF_FREQUENCY_UP_THRESHOLD	(80)
 	#define MICRO_FREQUENCY_UP_THRESHOLD	(85)
 #else
-	#define DEF_FREQUENCY_UP_THRESHOLD	(80)
+	#define DEF_FREQUENCY_UP_THRESHOLD	(63)
 	#define MICRO_FREQUENCY_UP_THRESHOLD	(95)
 #endif
 #define DEF_SAMPLING_DOWN_FACTOR		(1)
@@ -138,7 +138,7 @@ static void dbs_freq_increase(struct cpufreq_policy *policy, unsigned int freq)
 }
 
 /*
- * Every sampling_rate, we check, if current idle time is less than 20%
+ * Every sampling_rate, we check, if current idle time is less than 37%
  * (default), then we try to increase frequency. Else, we adjust the frequency
  * proportional to load.
  */
