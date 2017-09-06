@@ -233,6 +233,7 @@ int elevator_init(struct request_queue *q, char *name)
 					e = elevator_get("bfq-mq", false);
 				#else
 				e = elevator_get("mq-deadline", false);
+				#endif
 			if (!e)
 				return 0;
 		} else
