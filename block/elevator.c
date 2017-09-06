@@ -222,7 +222,7 @@ int elevator_init(struct request_queue *q, char *name)
 
 	if (!e) {
 		/*
-		 * For blk-mq devices, we default to using mq-bfq, if
+		 * For blk-mq devices, we default to using bfq-mq, if
 		 * available, else mq-deadline, for single queue devices.
 		 * If deadline isn't available OR we have multiple queues,
 		 *  default to "none".
