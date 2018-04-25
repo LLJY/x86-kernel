@@ -173,16 +173,11 @@ static unsigned int get_next_freq(struct sugov_policy *sg_policy,
 
 static void sugov_get_util(struct sugov_cpu *sg_cpu)
 {
-#ifdef CONFIG_SCHED_PDS
-	sg_cpu->max = arch_scale_cpu_capacity(NULL, sg_cpu->cpu);
-#else
 	struct rq *rq = cpu_rq(sg_cpu->cpu);
-	struct rq *rq = cpu_rq(cpu);
 
 	sg_cpu->max = arch_scale_cpu_capacity(NULL, sg_cpu->cpu);
 	sg_cpu->util_cfs = cpu_util_cfs(rq);
 	sg_cpu->util_dl  = cpu_util_dl(rq);
-#endif
 }
 
 static unsigned long sugov_aggregate_util(struct sugov_cpu *sg_cpu)
@@ -198,16 +193,12 @@ static unsigned long sugov_aggregate_util(struct sugov_cpu *sg_cpu)
 			util += sg_cpu->util_cfs;
 	}
 
-#ifdef CONFIG_SCHED_PDS
-	return sg_cpu->max;
-#else
 	/*
 	 * Ideally we would like to set util_dl as min/guaranteed freq and
 	 * util_cfs + util_dl as requested freq. However, cpufreq is not yet
 	 * ready for such an interface. So, we only do the latter for now.
 	 */
-	return min(sg_cpu->util_cfs + sg_cpu->util_dl, sg_cpu->max);
-#endif
+	return min(util, sg_cpu->max);
 }
 
 static void sugov_set_iowait_boost(struct sugov_cpu *sg_cpu, u64 time, unsigned int flags)
@@ -499,15 +490,6 @@ static int sugov_kthread_create(struct sugov_policy *sg_policy)
 		.sched_flags	= SCHED_FLAG_SUGOV,
 		.sched_nice	= 0,
 		.sched_priority	= 0,
-		.size = sizeof(struct sched_attr),
-#ifdef CONFIG_SCHED_PDS
-		.sched_policy = SCHED_FIFO,
-#else
-		.sched_policy = SCHED_DEADLINE,
-		.sched_flags = SCHED_FLAG_SUGOV,
-#endif
-		.sched_nice = 0,
-		.sched_priority = 0,
 		/*
 		 * Fake (unused) bandwidth; workaround to "fix"
 		 * priority inheritance.
