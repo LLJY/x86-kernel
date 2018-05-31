@@ -623,6 +623,7 @@ struct task_struct {
 	unsigned long			wakee_flip_decay_ts;
 	struct task_struct		*last_wakee;
 
+#ifndef CONFIG_SCHED_PDS
 	/*
 	 * recent_used_cpu is initially set as the last CPU used by a task
 	 * that wakes affine another task. Waker/wakee relationships can
@@ -631,6 +632,7 @@ struct task_struct {
 	 * used CPU that may be idle.
 	 */
 	int				recent_used_cpu;
+#endif /* CONFIG_SCHED_PDS */
 	int				wake_cpu;
 #endif
 	int				on_rq;
@@ -639,7 +641,6 @@ struct task_struct {
 	int				static_prio;
 	int				normal_prio;
 	unsigned int			rt_priority;
-
 	const struct sched_class	*sched_class;
 	struct sched_entity		se;
 	struct sched_rt_entity		rt;
@@ -1184,7 +1185,6 @@ struct task_struct {
 	 * Do not put anything below here!
 	 */
 };
-
 static inline struct pid *task_pid(struct task_struct *task)
 {
 	return task->pids[PIDTYPE_PID].pid;

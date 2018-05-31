@@ -503,7 +503,12 @@ static int sugov_kthread_create(struct sugov_policy *sg_policy)
 		return PTR_ERR(thread);
 	}
 
+#ifdef CONFIG_SCHED_PDS
+	ret = sched_setattr(thread, &attr);
+#else
 	ret = sched_setattr_nocheck(thread, &attr);
+#endif
+
 	if (ret) {
 		kthread_stop(thread);
 		pr_warn("%s: failed to set SCHED_DEADLINE\n", __func__);
