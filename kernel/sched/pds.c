@@ -3026,7 +3026,9 @@ static void sched_tick_remote(struct work_struct *work)
 	struct tick_work *twork = container_of(dwork, struct tick_work, work);
 	int cpu = twork->cpu;
 	struct rq *rq = cpu_rq(cpu);
+	struct task_struct *curr;
 	unsigned long flags;
+	u64 delta;
 
 	/*
 	 * Handle the tick only if it appears the remote CPU is running in full
@@ -3035,25 +3037,30 @@ static void sched_tick_remote(struct work_struct *work)
 	 * statistics and checks timeslices in a time-independent way, regardless
 	 * of when exactly it is running.
 	 */
-	if (!idle_cpu(cpu) && tick_nohz_tick_stopped_cpu(cpu)) {
-		struct task_struct *curr;
-		u64 delta;
+	if (idle_cpu(cpu) || !tick_nohz_tick_stopped_cpu(cpu))
+		goto out_requeue;
 
-		raw_spin_lock_irqsave(&rq->lock, flags);
-		update_rq_clock(rq);
-		curr = rq->curr;
-		delta = rq_clock_task(rq) - curr->last_ran;
+	raw_spin_lock_irqsave(&rq->lock, flags);
+	curr = rq->curr;
 
-		/*
-		 * Make sure the next tick runs within a reasonable
-		 * amount of time.
-		 */
-		WARN_ON_ONCE(delta > (u64)NSEC_PER_SEC * 3);
-		pds_scheduler_task_tick(rq);
-		update_sched_rq_queued_masks_normal(rq);
-		raw_spin_unlock_irqrestore(&rq->lock, flags);
-	}
+	if (is_idle_task(curr))
+		goto out_unlock;
 
+	update_rq_clock(rq);
+	delta = rq_clock_task(rq) - curr->last_ran;
+
+	/*
+	 * Make sure the next tick runs within a reasonable
+	 * amount of time.
+	 */
+	WARN_ON_ONCE(delta > (u64)NSEC_PER_SEC * 3);
+	pds_scheduler_task_tick(rq);
+	update_sched_rq_queued_masks_normal(rq);
+
+out_unlock:
+	raw_spin_unlock_irqrestore(&rq->lock, flags);
+
+out_requeue:
 	/*
 	 * Run the remote tick once per second (1Hz). This arbitrary
 	 * frequency is large enough to avoid overload but short enough
