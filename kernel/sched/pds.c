@@ -176,6 +176,15 @@ static inline int timeslice(void)
 }
 
 #ifdef CONFIG_SMP
+
+#define MAX_SCHED_RQ_NR_RUNNING_BITS (32UL)
+
+static cpumask_t sched_rq_nr_running_masks[MAX_SCHED_RQ_NR_RUNNING_BITS]
+____cacheline_aligned_in_smp;
+
+static DECLARE_BITMAP(sched_rq_nr_running_mb, MAX_SCHED_RQ_NR_RUNNING_BITS)
+____cacheline_aligned_in_smp;
+
 enum {
 SCHED_RQ_EMPTY		=	0,
 SCHED_RQ_IDLE,
@@ -196,8 +205,6 @@ ____cacheline_aligned_in_smp;
 
 static DECLARE_BITMAP(sched_rq_queued_masks_bitmap, NR_SCHED_RQ_QUEUED_LEVEL)
 ____cacheline_aligned_in_smp;
-
-static cpumask_t sched_rq_pending_mask ____cacheline_aligned_in_smp;
 
 DEFINE_PER_CPU(cpumask_t [NR_CPU_AFFINITY_CHK_LEVEL], sched_cpu_affinity_chk_masks);
 DEFINE_PER_CPU(cpumask_t *, sched_cpu_affinity_chk_end_masks);
@@ -443,6 +450,17 @@ __update_cpumasks_bitmap(int cpu, unsigned long *plevel, unsigned long level,
 	return true;
 }
 
+static inline void update_sched_rq_nr_running_masks(struct rq *rq)
+{
+	unsigned long level;
+
+	level = find_last_bit(&rq->nr_running, MAX_SCHED_RQ_NR_RUNNING_BITS);
+	level %= MAX_SCHED_RQ_NR_RUNNING_BITS;
+	__update_cpumasks_bitmap(cpu_of(rq), &rq->nr_running_level, level,
+				 &sched_rq_nr_running_masks[0],
+				 &sched_rq_nr_running_mb[0]);
+}
+
 static inline int
 task_running_policy_level(const struct task_struct *p, const struct rq *rq)
 {
@@ -557,8 +575,7 @@ static inline void dequeue_task(struct task_struct *p, struct rq *rq)
 		update_sched_rq_queued_masks(rq);
 	rq->nr_running--;
 #ifdef CONFIG_SMP
-	if (1 == rq->nr_running)
-		cpumask_clear_cpu(cpu_of(rq), &sched_rq_pending_mask);
+	update_sched_rq_nr_running_masks(rq);
 #endif
 
 	sched_update_tick_dependency(rq);
@@ -660,8 +677,7 @@ static inline void enqueue_task(struct task_struct *p, struct rq *rq)
 		update_sched_rq_queued_masks(rq);
 	rq->nr_running++;
 #ifdef CONFIG_SMP
-	if (2 == rq->nr_running)
-		cpumask_set_cpu(cpu_of(rq), &sched_rq_pending_mask);
+	update_sched_rq_nr_running_masks(rq);
 #endif
 
 	sched_update_tick_dependency(rq);
@@ -1001,8 +1017,7 @@ static void activate_task(struct task_struct *p, struct rq *rq)
 }
 
 /*
- * deactivate_task - If it's running, it's not on the rq and we can just
- * decrement the nr_running.
+ * deactivate_task - remove a task from the runqueue.
  *
  * Context: rq->lock
  */
@@ -3290,14 +3305,15 @@ static inline struct task_struct *take_other_rq_task(int cpu)
 	struct cpumask tmp;
 	struct cpumask *affinity_mask, *end;
 
-	if (cpumask_empty(&sched_rq_pending_mask))
+	if (cpumask_full(&sched_rq_nr_running_masks[0]))
 		return NULL;
 
 	affinity_mask = &(per_cpu(sched_cpu_affinity_chk_masks, cpu)[0]);
 	end = per_cpu(sched_cpu_affinity_chk_end_masks, cpu);
 	for (;affinity_mask < end; affinity_mask++) {
 		struct task_struct *p;
-		if (cpumask_and(&tmp, &sched_rq_pending_mask, affinity_mask) &&
+		if (cpumask_andnot(&tmp, affinity_mask,
+				   &sched_rq_nr_running_masks[0]) &&
 		    (p = take_queued_task_cpumask(cpu, &tmp)))
 			return p;
 	}
@@ -6113,7 +6129,8 @@ void __init sched_init(void)
 	cpumask_setall(&sched_rq_queued_masks[SCHED_RQ_EMPTY]);
 	set_bit(SCHED_RQ_EMPTY, sched_rq_queued_masks_bitmap);
 
-	cpumask_clear(&sched_rq_pending_mask);
+	cpumask_setall(&sched_rq_nr_running_masks[0]);
+	set_bit(0, sched_rq_nr_running_mb);
 #else
 	uprq = &per_cpu(runqueues, 0);
 #endif
@@ -6130,6 +6147,7 @@ void __init sched_init(void)
 		rq->cpu = i;
 
 		rq->queued_level = SCHED_RQ_EMPTY;
+		rq->nr_running_level = 0UL;
 
 #ifdef CONFIG_SCHED_SMT
 		per_cpu(cpu_has_smt_sibling, i)  = 0;

@@ -95,6 +95,7 @@ struct rq {
 	unsigned long nr_running;
 	unsigned long nr_uninterruptible;
 
+	unsigned long nr_running_level;
 	unsigned long queued_level;
 
 #ifdef CONFIG_SCHED_HRTICK
