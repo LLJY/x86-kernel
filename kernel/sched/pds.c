@@ -425,6 +425,24 @@ task_deadline_level(const struct task_struct *p, const struct rq *rq)
 }
 
 #ifdef	CONFIG_SMP
+static inline bool
+__update_cpumasks_bitmap(int cpu, unsigned long *plevel, unsigned long level,
+			 cpumask_t cpumasks[], unsigned long bitmap[])
+{
+	if (*plevel == level)
+		return false;
+
+	cpumask_clear_cpu(cpu, cpumasks + *plevel);
+	if (cpumask_empty(cpumasks + *plevel))
+		clear_bit(*plevel, bitmap);
+	cpumask_set_cpu(cpu, cpumasks + level);
+	set_bit(level, bitmap);
+
+	*plevel = level;
+
+	return true;
+}
+
 static inline int
 task_running_policy_level(const struct task_struct *p, const struct rq *rq)
 {
@@ -438,40 +456,24 @@ task_running_policy_level(const struct task_struct *p, const struct rq *rq)
 	return PRIO_LIMIT - prio;
 }
 
-static inline void
-__update_sched_rq_queued_masks(struct rq *rq, const int cpu,
-			       const int last_level, const int level)
-{
-	cpumask_clear_cpu(cpu, &sched_rq_queued_masks[last_level]);
-	if (cpumask_empty(&sched_rq_queued_masks[last_level]))
-		clear_bit(last_level, sched_rq_queued_masks_bitmap);
-
-	cpumask_set_cpu(cpu, &sched_rq_queued_masks[level]);
-	set_bit(level, sched_rq_queued_masks_bitmap);
-
-	rq->queued_level = level;
-}
-
 static inline void update_sched_rq_queued_masks_normal(struct rq *rq)
 {
 	struct task_struct *p = rq_first_queued_task(rq);
 
-	if (p != NULL && p->prio == NORMAL_PRIO) {
-		int level = task_running_policy_level(p, rq);
-		int last_level = rq->queued_level;
+	if (p == NULL || p->prio != NORMAL_PRIO)
+		return;
 
-		if (last_level == level)
-			return;
-
-		__update_sched_rq_queued_masks(rq, cpu_of(rq), last_level, level);
-	}
+	__update_cpumasks_bitmap(cpu_of(rq), &rq->queued_level,
+				 task_running_policy_level(p, rq),
+				 &sched_rq_queued_masks[0],
+				 &sched_rq_queued_masks_bitmap[0]);
 }
 
 static inline void update_sched_rq_queued_masks(struct rq *rq)
 {
 	int cpu = cpu_of(rq);
 	struct task_struct *p;
-	int level, last_level = rq->queued_level;
+	unsigned long level, last_level = rq->queued_level;
 
 	if ((p = rq_first_queued_task(rq)) == NULL) {
 		level = SCHED_RQ_EMPTY;
@@ -481,10 +483,10 @@ static inline void update_sched_rq_queued_masks(struct rq *rq)
 		sched_rq_prio[cpu] = p->prio;
 	}
 
-	if (last_level == level)
+	if (!__update_cpumasks_bitmap(cpu, &rq->queued_level, level,
+				      &sched_rq_queued_masks[0],
+				      &sched_rq_queued_masks_bitmap[0]))
 		return;
-
-	__update_sched_rq_queued_masks(rq, cpu, last_level, level);
 
 #ifdef CONFIG_SCHED_SMT
 	if (per_cpu(cpu_has_smt_sibling, cpu)) {
