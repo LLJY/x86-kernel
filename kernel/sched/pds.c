@@ -41,18 +41,18 @@
 #include <trace/events/sched.h>
 
 
-#define rt_prio(prio)		unlikely((prio) < MAX_RT_PRIO)
+#define rt_prio(prio)		((prio) < MAX_RT_PRIO)
 #define rt_task(p)		rt_prio((p)->prio)
-#define batch_task(p)		(unlikely((p)->policy == SCHED_BATCH))
+#define batch_task(p)		((p)->policy == SCHED_BATCH)
 #define is_rt_policy(policy)	((policy) == SCHED_FIFO || \
 					(policy) == SCHED_RR)
-#define has_rt_policy(p)	unlikely(is_rt_policy((p)->policy))
+#define has_rt_policy(p)	(is_rt_policy((p)->policy))
 
 /* is_idle_policy() and idleprio_task() are defined in include/linux/sched.h */
-#define task_running_idle(p)	unlikely((p)->prio == IDLE_PRIO)
+#define task_running_idle(p)	((p)->prio == IDLE_PRIO)
 
 /* is_iso_policy() and iso_task() are defined in include/linux/sched.h */
-#define task_running_iso(p)	unlikely((p)->prio == ISO_PRIO)
+#define task_running_iso(p)	((p)->prio == ISO_PRIO)
 
 #define ISO_PERIOD		((5 * HZ) + 1)
 
@@ -1517,7 +1517,10 @@ task_preemptible_rq(struct task_struct *p, cpumask_t *chk_mask,
 		return best_mask_cpu(task_cpu(p), &tmp);
 #endif
 
-	preempt_level = task_running_policy_level(p, this_rq());
+	if (batch_task(p))
+		preempt_level = SCHED_RQ_NORMAL_0;
+	else
+		preempt_level = task_running_policy_level(p, this_rq());
 	level = find_first_bit(sched_rq_queued_masks_bitmap,
 			       NR_SCHED_RQ_QUEUED_LEVEL);
 
@@ -1530,29 +1533,15 @@ task_preemptible_rq(struct task_struct *p, cpumask_t *chk_mask,
 				      level + 1);
 	}
 
-	/*
-	 * only_preempt_low_policy indicate just preempt rq running lower
-	 * policy task than p
-	 */
-	if (only_preempt_low_policy)
-		return best_mask_cpu(task_cpu(p), chk_mask);
+	if (unlikely(level == preempt_level &&
+		     SCHED_RQ_RT == level &&
+		     cpumask_and(&tmp, chk_mask,
+				 &sched_rq_queued_masks[preempt_level]))) {
+		unsigned int cpu;
 
-	if (unlikely(level != preempt_level))
-		return best_mask_cpu(task_cpu(p), chk_mask);
-
-	/* IDLEPRIO tasks never preempt anything but idle */
-	if (idleprio_task(p))
-		return best_mask_cpu(task_cpu(p), chk_mask);
-
-	if (cpumask_and(&tmp, chk_mask, &sched_rq_queued_masks[preempt_level])) {
-		if (unlikely((SCHED_RQ_RT == level))) {
-			unsigned int cpu;
-
-			for_each_cpu (cpu, &tmp)
-				if (p->prio < sched_rq_prio[cpu])
-					return cpu;
-		}
-		return best_mask_cpu(task_cpu(p), &tmp);
+		for_each_cpu (cpu, &tmp)
+			if (p->prio < sched_rq_prio[cpu])
+				return cpu;
 	}
 
 	return best_mask_cpu(task_cpu(p), chk_mask);
