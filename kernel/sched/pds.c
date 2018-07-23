@@ -3289,10 +3289,15 @@ take_queued_task_cpumask(int cpu, struct cpumask *chk_mask)
 		int nr_migrated;
 		struct rq *src_rq = cpu_rq(src_cpu);
 
-		raw_spin_lock_nested(&src_rq->lock, SINGLE_DEPTH_NESTING);
+		if (unlikely(!do_raw_spin_trylock(&src_rq->lock)))
+			continue;
+		spin_acquire(&src_rq->lock.dep_map, SINGLE_DEPTH_NESTING, 1, _RET_IP_);
+
 		update_rq_clock(src_rq);
 		nr_migrated = migrate_pending_tasks(src_rq, cpu);
-		raw_spin_unlock(&src_rq->lock);
+
+		spin_release(&src_rq->lock.dep_map, 1, _RET_IP_);
+		do_raw_spin_unlock(&src_rq->lock);
 
 		if (nr_migrated)
 			return rq_first_queued_task(cpu_rq(cpu));
