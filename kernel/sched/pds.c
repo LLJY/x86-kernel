@@ -207,6 +207,7 @@ static DECLARE_BITMAP(sched_rq_queued_masks_bitmap, NR_SCHED_RQ_QUEUED_LEVEL)
 ____cacheline_aligned_in_smp;
 
 DEFINE_PER_CPU(cpumask_t [NR_CPU_AFFINITY_CHK_LEVEL], sched_cpu_affinity_chk_masks);
+DEFINE_PER_CPU(cpumask_t *, sched_cpu_llc_start_mask);
 DEFINE_PER_CPU(cpumask_t *, sched_cpu_affinity_chk_end_masks);
 
 #ifdef CONFIG_SCHED_SMT
@@ -3250,7 +3251,8 @@ static inline void check_deadline(struct task_struct *p, struct rq *rq)
  * Will try to migrate mininal of half of @rq nr_running tasks and
  * SCHED_RQ_NR_MIGRATION to @dest_cpu
  */
-static inline int migrate_pending_tasks(struct rq *rq, int dest_cpu)
+static inline int
+migrate_pending_tasks(struct rq *rq, struct rq *dest_rq, int dest_cpu)
 {
 	int nr_migrated = 0;
 	int nr_max_tries = min(rq->nr_running / 2, SCHED_RQ_NR_MIGRATION);
@@ -3272,7 +3274,7 @@ static inline int migrate_pending_tasks(struct rq *rq, int dest_cpu)
 		if (!task_running(p) &&
 		    cpumask_test_cpu(dest_cpu, &p->cpus_allowed)) {
 			detach_task(rq, p, dest_cpu);
-			attach_task(cpu_rq(dest_cpu), p);
+			attach_task(dest_rq, p);
 			nr_migrated++;
 		}
 	}
@@ -3281,7 +3283,7 @@ static inline int migrate_pending_tasks(struct rq *rq, int dest_cpu)
 }
 
 static inline struct task_struct *
-take_queued_task_cpumask(int cpu, struct cpumask *chk_mask)
+take_queued_task_cpumask(struct rq *rq, int cpu, struct cpumask *chk_mask)
 {
 	int src_cpu;
 
@@ -3294,34 +3296,31 @@ take_queued_task_cpumask(int cpu, struct cpumask *chk_mask)
 		spin_acquire(&src_rq->lock.dep_map, SINGLE_DEPTH_NESTING, 1, _RET_IP_);
 
 		update_rq_clock(src_rq);
-		nr_migrated = migrate_pending_tasks(src_rq, cpu);
+		nr_migrated = migrate_pending_tasks(src_rq, rq, cpu);
 
 		spin_release(&src_rq->lock.dep_map, 1, _RET_IP_);
 		do_raw_spin_unlock(&src_rq->lock);
 
 		if (nr_migrated)
-			return rq_first_queued_task(cpu_rq(cpu));
+			return rq_first_queued_task(rq);
 	}
 	return NULL;
 }
 
-static inline struct task_struct *take_other_rq_task(int cpu)
+static inline struct task_struct *take_other_rq_task(struct rq *rq, int cpu)
 {
 	struct cpumask tmp;
 	struct cpumask *affinity_mask, *end;
 
-	if (cpumask_full(&sched_rq_nr_running_masks[0]))
-		return NULL;
-
-	affinity_mask = &(per_cpu(sched_cpu_affinity_chk_masks, cpu)[0]);
+	affinity_mask = per_cpu(sched_cpu_llc_start_mask, cpu);
 	end = per_cpu(sched_cpu_affinity_chk_end_masks, cpu);
-	for (;affinity_mask < end; affinity_mask++) {
+	do {
 		struct task_struct *p;
 		if (cpumask_andnot(&tmp, affinity_mask,
 				   &sched_rq_nr_running_masks[0]) &&
-		    (p = take_queued_task_cpumask(cpu, &tmp)))
+		    (p = take_queued_task_cpumask(rq, cpu, &tmp)))
 			return p;
-	}
+	} while (++affinity_mask < end);
 
 	return NULL;
 }
@@ -3336,7 +3335,7 @@ static inline struct task_struct *choose_next_task(struct rq *rq, int cpu)
 
 #ifdef	CONFIG_SMP
 	if (likely(rq->online))
-		if ((next = take_other_rq_task(cpu)))
+		if ((next = take_other_rq_task(rq, cpu)))
 			return next;
 #endif
 	return rq->idle;
@@ -6026,6 +6025,8 @@ static void sched_init_topology_cpumask_early(void)
 			cpumask_copy(tmp, cpu_possible_mask);
 			cpumask_clear_cpu(cpu, tmp);
 		}
+		per_cpu(sched_cpu_llc_start_mask, cpu) =
+			&(per_cpu(sched_cpu_affinity_chk_masks, cpu)[0]);
 		per_cpu(sched_cpu_affinity_chk_end_masks, cpu) =
 			&(per_cpu(sched_cpu_affinity_chk_masks, cpu)[1]);
 	}
@@ -6039,22 +6040,23 @@ static void sched_init_topology_cpumask(void)
 	for_each_online_cpu(cpu) {
 		chk = &(per_cpu(sched_cpu_affinity_chk_masks, cpu)[0]);
 
+#ifdef CONFIG_SCHED_SMT
 		cpumask_setall(chk);
 		cpumask_clear_cpu(cpu, chk);
-#ifdef CONFIG_SCHED_SMT
 		if (cpumask_and(chk, chk, topology_sibling_cpumask(cpu))) {
 			printk(KERN_INFO "pds: cpu #%d affinity check mask - smt 0x%08lx",
 			       cpu, (chk++)->bits[0]);
 			per_cpu(cpu_has_smt_sibling, cpu) = 1;
 		}
-		cpumask_complement(chk, topology_sibling_cpumask(cpu));
 #endif
-#ifdef CONFIG_SCHED_MC
-		if (cpumask_and(chk, chk, cpu_coregroup_mask(cpu)))
+		cpumask_setall(chk);
+		cpumask_clear_cpu(cpu, chk);
+		if (cpumask_and(chk, chk, cpu_coregroup_mask(cpu))) {
+			per_cpu(sched_cpu_llc_start_mask, cpu) = chk;
 			printk(KERN_INFO "pds: cpu #%d affinity check mask - coregroup 0x%08lx",
 			       cpu, (chk++)->bits[0]);
+		}
 		cpumask_complement(chk, cpu_coregroup_mask(cpu));
-#endif
 
 		/**
 		 * Set up sd_llc_id per CPU
