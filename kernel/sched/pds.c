@@ -811,7 +811,15 @@ void resched_curr(struct rq *rq)
 
 static inline void check_preempt_curr(struct rq *rq, struct task_struct *p)
 {
-	if (p->priodl < rq->curr->priodl)
+	struct task_struct *curr = rq->curr;
+
+	if (curr->prio == PRIO_LIMIT)
+		resched_curr(rq);
+
+	if (batch_task(p) || idleprio_task(p))
+		return;
+
+	if (p->priodl < curr->priodl)
 		resched_curr(rq);
 }
 
@@ -1147,8 +1155,6 @@ static void attach_task(struct rq *rq, struct task_struct *p)
 	enqueue_task(p, rq);
 	p->on_rq = TASK_ON_RQ_QUEUED;
 	cpufreq_update_this_cpu(rq, 0);
-
-	check_preempt_curr(rq, p);
 }
 
 /*
@@ -1168,6 +1174,8 @@ static struct rq *move_queued_task(struct rq *rq, struct task_struct *p, int
 	update_rq_clock(rq);
 
 	attach_task(rq, p);
+
+	check_preempt_curr(rq, p);
 
 	return rq;
 }
@@ -2948,11 +2956,8 @@ static inline bool pds_load_balance(struct rq *rq)
 		/*
 		 * _something_ may have changed the task, double check again
 		 */
-		if (likely(!p->on_cpu && task_on_rq_queued(p) &&
-			   rq == task_rq(p))) {
+		if (likely(!p->on_cpu && task_on_rq_queued(p) && rq == task_rq(p)))
 			rq = __migrate_task(rq, p, best_mask_cpu(cpu, &check));
-			resched_curr(rq);
-		}
 
 		raw_spin_unlock(&rq->lock);
 		raw_spin_unlock(&p->pi_lock);
@@ -3290,8 +3295,10 @@ take_queued_task_cpumask(struct rq *rq, int cpu, struct cpumask *chk_mask)
 		spin_release(&src_rq->lock.dep_map, 1, _RET_IP_);
 		do_raw_spin_unlock(&src_rq->lock);
 
-		if (nr_migrated)
+		if (nr_migrated) {
+			resched_curr(rq);
 			return rq_first_queued_task(rq);
+		}
 	}
 	return NULL;
 }
