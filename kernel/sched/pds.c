@@ -1514,8 +1514,7 @@ static inline int best_mask_cpu(const int cpu, cpumask_t *cpumask)
  * @only_preempt_low_policy: indicate only preempt rq running low policy than @p
  */
 static inline int
-task_preemptible_rq(struct task_struct *p, cpumask_t *chk_mask,
-		    int only_preempt_low_policy)
+task_preemptible_rq(struct task_struct *p, cpumask_t *chk_mask)
 {
 	cpumask_t tmp;
 	int level, preempt_level;
@@ -1562,23 +1561,17 @@ task_preemptible_rq(struct task_struct *p, cpumask_t *chk_mask,
 #define WF_FORK		0x02		/* child wakeup after fork */
 #define WF_MIGRATED	0x04		/* internal use, task got migrated */
 
-static inline int select_task_rq(struct task_struct *p, int wake_flags)
+static inline int select_task_rq(struct task_struct *p)
 {
 	cpumask_t chk_mask;
 
 	if (unlikely(!cpumask_and(&chk_mask, &p->cpus_allowed, cpu_online_mask)))
 		return select_fallback_rq(task_cpu(p), p);
 
-	/*
-	 * Sync wakeups (i.e. those types of wakeups where the waker
-	 * has indicated that it will leave the CPU in short order)
-	 * don't trigger a preemption if there are no idle cpus,
-	 * instead waiting for current to deschedule.
-	 */
-	return task_preemptible_rq(p, &chk_mask, wake_flags & WF_SYNC);
+	return task_preemptible_rq(p, &chk_mask);
 }
 #else /* CONFIG_SMP */
-static inline int select_task_rq(struct task_struct *p, int wake_flags)
+static inline int select_task_rq(struct task_struct *p)
 {
 	return 0;
 }
@@ -1861,7 +1854,7 @@ static int try_to_wake_up(struct task_struct *p, unsigned int state,
 		update_task_priodl(p);
 	}
 
-	cpu = select_task_rq(p, wake_flags);
+	cpu = select_task_rq(p);
 
 	if (cpu != task_cpu(p)) {
 		wake_flags |= WF_MIGRATED;
@@ -2178,7 +2171,7 @@ void wake_up_new_task(struct task_struct *p)
 
 	p->state = TASK_RUNNING;
 
-	rq = cpu_rq(select_task_rq(p, 0));
+	rq = cpu_rq(select_task_rq(p));
 #ifdef CONFIG_SMP
 	/*
 	 * Fork balancing, do it here and not earlier because:
