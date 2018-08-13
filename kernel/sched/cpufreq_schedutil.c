@@ -199,6 +199,10 @@ static unsigned int get_next_freq(struct sugov_policy *sg_policy,
  */
 static unsigned long sugov_get_util(struct sugov_cpu *sg_cpu)
 {
+#ifdef CONFIG_SCHED_PDS
+	sg_cpu->max = arch_scale_cpu_capacity(NULL, sg_cpu->cpu);
+	return sg_cpu->max;
+#else
 	struct rq *rq = cpu_rq(sg_cpu->cpu);
 	unsigned long util, irq, max;
 
@@ -261,6 +265,7 @@ static unsigned long sugov_get_util(struct sugov_cpu *sg_cpu)
 	 * an interface. So, we only do the latter for now.
 	 */
 	return min(max, util + sg_cpu->bw_dl);
+#endif
 }
 
 /**
@@ -415,7 +420,9 @@ static inline bool sugov_cpu_is_busy(struct sugov_cpu *sg_cpu) { return false; }
  */
 static inline void ignore_dl_rate_limit(struct sugov_cpu *sg_cpu, struct sugov_policy *sg_policy)
 {
+#ifndef CONFIG_SCHED_PDS
 	if (cpu_bw_dl(cpu_rq(sg_cpu->cpu)) > sg_cpu->bw_dl)
+#endif
 		sg_policy->need_freq_update = true;
 }
 
@@ -626,8 +633,12 @@ static int sugov_kthread_create(struct sugov_policy *sg_policy)
 	struct task_struct *thread;
 	struct sched_attr attr = {
 		.size		= sizeof(struct sched_attr),
+#ifdef CONFIG_SCHED_PDS
+		.sched_policy	= SCHED_FIFO,
+#else
 		.sched_policy	= SCHED_DEADLINE,
 		.sched_flags	= SCHED_FLAG_SUGOV,
+#endif
 		.sched_nice	= 0,
 		.sched_priority	= 0,
 		/*
@@ -655,7 +666,12 @@ static int sugov_kthread_create(struct sugov_policy *sg_policy)
 		return PTR_ERR(thread);
 	}
 
+#ifdef CONFIG_SCHED_PDS
+	ret = sched_setattr(thread, &attr);
+#else
 	ret = sched_setattr_nocheck(thread, &attr);
+#endif
+
 	if (ret) {
 		kthread_stop(thread);
 		pr_warn("%s: failed to set SCHED_DEADLINE\n", __func__);
