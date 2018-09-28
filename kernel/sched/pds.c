@@ -6269,8 +6269,6 @@ void __init sched_init(void)
 
 	print_scheduler_version();
 
-	sched_clock_init();
-
 	wait_bit_init();
 
 #ifdef CONFIG_SMP
