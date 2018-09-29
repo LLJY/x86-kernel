@@ -37,6 +37,8 @@
 #include "../workqueue_internal.h"
 #include "../smpboot.h"
 
+#include "pelt.h"
+
 #define CREATE_TRACE_POINTS
 #include <trace/events/sched.h>
 
@@ -329,8 +331,11 @@ static void update_rq_clock_task(struct rq *rq, s64 delta)
  * In theory, the compile should just see 0 here, and optimize out the call
  * to sched_rt_avg_update. But I don't trust it...
  */
+#ifdef HAVE_SCHED_AVG_IRQ
+	s64 steal = 0, irq_delta = 0;
+#endif
 #ifdef CONFIG_IRQ_TIME_ACCOUNTING
-	s64 irq_delta = irq_time_read(cpu_of(rq)) - rq->prev_irq_time;
+	irq_delta = irq_time_read(cpu_of(rq)) - rq->prev_irq_time;
 
 	/*
 	 * Since irq_time is only updated on {soft,}irq_exit, we might run into
@@ -355,8 +360,7 @@ static void update_rq_clock_task(struct rq *rq, s64 delta)
 #endif
 #ifdef CONFIG_PARAVIRT_TIME_ACCOUNTING
 	if (static_key_false((&paravirt_steal_rq_enabled))) {
-		s64 steal = paravirt_steal_clock(cpu_of(rq));
-
+		steal = paravirt_steal_clock(cpu_of(rq));
 		steal -= rq->prev_steal_time_rq;
 
 		if (unlikely(steal > delta))
@@ -369,6 +373,11 @@ static void update_rq_clock_task(struct rq *rq, s64 delta)
 #endif
 
 	rq->clock_task += delta;
+
+#ifdef HAVE_SCHED_AVG_IRQ
+	if ((irq_delta + steal))
+		update_irq_load_avg(rq, irq_delta + steal);
+#endif
 }
 
 static inline void update_rq_clock(struct rq *rq)

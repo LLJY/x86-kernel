@@ -69,6 +69,11 @@ struct rq {
 	int cpu;		/* cpu of this runqueue */
 	bool online;
 
+#if defined(CONFIG_IRQ_TIME_ACCOUNTING) || defined(CONFIG_PARAVIRT_TIME_ACCOUNTING)
+#define HAVE_SCHED_AVG_IRQ
+	struct sched_avg	avg_irq;
+#endif
+
 	unsigned long queued_level;
 	unsigned long pending_level;
 
@@ -165,6 +170,14 @@ static inline void unregister_sched_domain_sysctl(void)
 #endif
 
 #endif /* CONFIG_SMP */
+
+#ifndef arch_scale_freq_capacity
+static __always_inline
+unsigned long arch_scale_freq_capacity(int cpu)
+{
+		return SCHED_CAPACITY_SCALE;
+}
+#endif
 
 static inline u64 __rq_clock_broken(struct rq *rq)
 {
