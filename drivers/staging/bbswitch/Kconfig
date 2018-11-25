@@ -1,0 +1,6 @@
+config BBSWITCH
+	tristate "Dynamically Disable Discreet Nvidia Graphics"
+	default n
+	help
+	  bbswitch is a kernel module which automatically detects the required ACPI calls for two kinds of Optimus laptops. It has been verified to work with "real" Optimus and "legacy" Optimus laptops (at least, that is how I call them).
+ 

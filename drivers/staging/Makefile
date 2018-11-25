@@ -52,3 +52,4 @@ obj-$(CONFIG_KPC2000)		+= kpc2000/
 obj-$(CONFIG_ISDN_CAPI)		+= isdn/
 obj-$(CONFIG_EXFAT_FS)		+= exfat/
 obj-$(CONFIG_THINKPAD_EC)	+= tp_smapi/
+obj-$(CONFIG_BBSWITCH)	+= bbswitch/
