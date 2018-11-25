@@ -54,3 +54,4 @@ obj-$(CONFIG_USB_WUSB)		+= wusbcore/
 obj-$(CONFIG_EXFAT_FS)		+= exfat/
 obj-$(CONFIG_QLGE)		+= qlge/
 obj-$(CONFIG_THINKPAD_EC)	+= tp_smapi/
+obj-$(CONFIG_BBSWITCH)	+= bbswitch/
