@@ -122,4 +122,6 @@ source "drivers/staging/isdn/Kconfig"
 
 source "drivers/staging/exfat/Kconfig"
 
+source "drivers/staging/tp_smapi/Kconfig"
+
 endif # STAGING
