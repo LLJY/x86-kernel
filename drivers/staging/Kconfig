@@ -128,4 +128,6 @@ source "drivers/staging/tp_smapi/Kconfig"
 
 source "drivers/staging/bbswitch/Kconfig"
 
+source "drivers/staging/acpi_call/Kconfig"
+
 endif # STAGING
