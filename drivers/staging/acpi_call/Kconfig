@@ -1,0 +1,10 @@
+menu "ACPI"
+
+config ACPI_CALL
+	tristate "Enables calls to ACPI methods through /proc/acpi/call" 
+	default n
+	help
+		A kernel simple module that enables you to call ACPI methods by writing the method name 
+		followed by arguments to /proc/acpi/call.
+		This module is to be considered a proof-of-concept and has been superseeded by projects like 
+		bbswitch. It allows you to tamper with your system and should be used with caution.
