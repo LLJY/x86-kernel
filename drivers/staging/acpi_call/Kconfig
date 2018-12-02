@@ -1,7 +1,5 @@
-menu "ACPI"
-
 config ACPI_CALL
-	tristate "Enables calls to ACPI methods through /proc/acpi/call" 
+	tristate "Enable calls to ACPI methods using /proc/acpi/call" 
 	default n
 	help
 		A kernel simple module that enables you to call ACPI methods by writing the method name 
