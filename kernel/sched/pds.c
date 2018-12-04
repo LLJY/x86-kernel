@@ -305,6 +305,28 @@ struct rq
 }
 
 /*
+ * __task_rq_lock - lock the rq @p resides on.
+ */
+struct rq *__task_rq_lock(struct task_struct *p, struct rq_flags *rf)
+	__acquires(rq->lock)
+{
+	struct rq *rq;
+
+	lockdep_assert_held(&p->pi_lock);
+
+	for (;;) {
+		rq = task_rq(p);
+		raw_spin_lock(&rq->lock);
+		if (likely(rq == task_rq(p) && !task_on_rq_migrating(p)))
+			return rq;
+		raw_spin_unlock(&rq->lock);
+
+		while (unlikely(task_on_rq_migrating(p)))
+			cpu_relax();
+	}
+}
+
+/*
  * RQ-clock updating methods:
  */
 
@@ -717,7 +739,7 @@ static inline void sched_update_tick_dependency(struct rq *rq) { }
  *
  * Context: rq->lock
  */
-static inline void dequeue_task(struct task_struct *p, struct rq *rq)
+static inline void dequeue_task(struct task_struct *p, struct rq *rq, int flags)
 {
 	lockdep_assert_held(&rq->lock);
 
@@ -731,6 +753,7 @@ static inline void dequeue_task(struct task_struct *p, struct rq *rq)
 	rq->nr_running--;
 
 	sched_update_tick_dependency(rq);
+	psi_dequeue(p, flags & DEQUEUE_SLEEP);
 
 	sched_info_dequeued(rq, p);
 }
@@ -802,7 +825,7 @@ DEFINE_SKIPLIST_INSERT_FUNC(pds_skiplist_insert, pds_skiplist_task_search);
  *
  * Context: rq->lock
  */
-static inline void enqueue_task(struct task_struct *p, struct rq *rq)
+static inline void enqueue_task(struct task_struct *p, struct rq *rq, int flags)
 {
 	lockdep_assert_held(&rq->lock);
 
@@ -820,6 +843,7 @@ static inline void enqueue_task(struct task_struct *p, struct rq *rq)
 	sched_update_tick_dependency(rq);
 
 	sched_info_queued(rq, p);
+	psi_enqueue(p, flags);
 
 	/*
 	 * If in_iowait is set, the code below may not trigger any cpufreq
@@ -1096,7 +1120,7 @@ static void activate_task(struct task_struct *p, struct rq *rq)
 {
 	if (task_contributes_to_load(p))
 		rq->nr_uninterruptible--;
-	enqueue_task(p, rq);
+	enqueue_task(p, rq, ENQUEUE_WAKEUP);
 	p->on_rq = 1;
 	cpufreq_update_this_cpu(rq, 0);
 }
@@ -1110,7 +1134,7 @@ static inline void deactivate_task(struct task_struct *p, struct rq *rq)
 {
 	if (task_contributes_to_load(p))
 		rq->nr_uninterruptible++;
-	dequeue_task(p, rq);
+	dequeue_task(p, rq, DEQUEUE_SLEEP);
 	p->on_rq = 0;
 	cpufreq_update_this_cpu(rq, 0);
 }
@@ -1212,7 +1236,7 @@ static void detach_task(struct rq *rq, struct task_struct *p, int target_cpu)
 	p->on_rq = TASK_ON_RQ_MIGRATING;
 	if (task_contributes_to_load(p))
 		rq->nr_uninterruptible++;
-	dequeue_task(p, rq);
+	dequeue_task(p, rq, 0);
 
 	set_task_cpu(p, target_cpu);
 }
@@ -1228,7 +1252,7 @@ static void attach_task(struct rq *rq, struct task_struct *p)
 
 	if (task_contributes_to_load(p))
 		rq->nr_uninterruptible--;
-	enqueue_task(p, rq);
+	enqueue_task(p, rq, 0);
 	p->on_rq = TASK_ON_RQ_QUEUED;
 	cpufreq_update_this_cpu(rq, 0);
 }
@@ -1962,6 +1986,7 @@ static int try_to_wake_up(struct task_struct *p, unsigned int state,
 
 	if (cpu != task_cpu(p)) {
 		wake_flags |= WF_MIGRATED;
+		psi_ttwu_dequeue(p);
 		set_task_cpu(p, cpu);
 	}
 #else /* CONFIG_SMP */
@@ -2915,6 +2940,8 @@ void scheduler_tick(void)
 	pds_scheduler_task_tick(rq);
 	update_sched_rq_queued_masks_normal(rq);
 	calc_global_load_tick(rq);
+	psi_task_tick(rq);
+
 	rq->last_tick = rq->clock;
 	raw_spin_unlock(&rq->lock);
 
@@ -4946,13 +4973,12 @@ SYSCALL_DEFINE3(sched_getaffinity, pid_t, pid, unsigned int, len,
 static void do_sched_yield(void)
 {
 	struct rq *rq;
+	struct rq_flags rf;
 
 	if (!sched_yield_type)
 		return;
 
-	local_irq_disable();
-	rq = this_rq();
-	raw_spin_lock(&rq->lock);
+	rq = this_rq_lock_irq(&rf);
 
 	if (sched_yield_type > 1) {
 		time_slice_expired(current, rq);
@@ -6123,6 +6149,8 @@ void __init sched_init(void)
 #endif /* SMP */
 
 	init_schedstats();
+
+	psi_init();
 }
 
 #ifdef CONFIG_DEBUG_ATOMIC_SLEEP
