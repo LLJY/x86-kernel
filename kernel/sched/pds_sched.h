@@ -28,6 +28,7 @@
 #include <linux/livepatch.h>
 #include <linux/membarrier.h>
 #include <linux/proc_fs.h>
+#include <linux/psi.h>
 #include <linux/slab.h>
 #include <linux/stackprotector.h>
 #include <linux/stop_machine.h>
@@ -211,12 +212,61 @@ task_access_unlock_irqrestore(struct task_struct *p, raw_spinlock_t *lock,
 	raw_spin_unlock_irqrestore(lock, *flags);
 }
 
+/*
+ * {de,en}queue flags:
+ *
+ * DEQUEUE_SLEEP  - task is no longer runnable
+ * ENQUEUE_WAKEUP - task just became runnable
+ *
+ */
+
+#define DEQUEUE_SLEEP		0x01
+
+#define ENQUEUE_WAKEUP		0x01
+
+
+/*
+ * Below are scheduler API which using in other kernel code
+ * It use the dummy rq_flags
+ * ToDo : PDS need to support these APIs for compatibility with mainline
+ * scheduler code.
+ */
+struct rq_flags {
+};
+
+struct rq *__task_rq_lock(struct task_struct *p, struct rq_flags *rf)
+	__acquires(rq->lock);
+
+static inline void __task_rq_unlock(struct rq *rq, struct rq_flags *rf)
+	__releases(rq->lock)
+{
+	raw_spin_unlock(&rq->lock);
+}
+
+static inline void
+rq_unlock_irq(struct rq *rq, struct rq_flags *rf)
+	__releases(rq->lock)
+{
+	raw_spin_unlock_irq(&rq->lock);
+}
+
+static inline struct rq *
+this_rq_lock_irq(struct rq_flags *rf)
+	__acquires(rq->lock)
+{
+	struct rq *rq;
+
+	local_irq_disable();
+	rq = this_rq();
+	raw_spin_lock(&rq->lock);
+
+	return rq;
+}
+
 static inline bool task_running(struct task_struct *p)
 {
 	return p->on_cpu;
 }
-
-#include "stats.h"
 
 extern struct static_key_false sched_schedstats;
 
@@ -254,6 +304,8 @@ static inline int cpu_of(const struct rq *rq)
 	return 0;
 #endif
 }
+
+#include "stats.h"
 
 #ifdef CONFIG_IRQ_TIME_ACCOUNTING
 struct irqtime {
