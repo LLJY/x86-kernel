@@ -397,6 +397,20 @@ static inline u64 static_deadline_diff(int static_prio)
 	return sched_prio2deadline[USER_PRIO(static_prio)];
 }
 
+/*
+ * The time_slice is only refilled when it is empty and that is when we set a
+ * new deadline for non-rt tasks.
+ */
+static inline void time_slice_expired(struct task_struct *p, struct rq *rq)
+{
+	p->time_slice = timeslice();
+
+	if (p->prio >= NORMAL_PRIO) {
+		p->deadline = rq->clock + task_deadline_diff(p);
+		update_task_priodl(p);
+	}
+}
+
 static inline struct task_struct *rq_first_queued_task(struct rq *rq)
 {
 	struct skiplist_node *node = rq->sl_header.next[0];
@@ -2047,8 +2061,6 @@ int wake_up_state(struct task_struct *p, unsigned int state)
 	return try_to_wake_up(p, state, 0);
 }
 
-static void time_slice_expired(struct task_struct *p, struct rq *rq);
-
 /*
  * Perform scheduler related setup for a newly forked process p.
  * p is forked by current.
@@ -3097,25 +3109,6 @@ NOKPROBE_SYMBOL(preempt_count_sub);
 static inline void preempt_latency_start(int val) { }
 static inline void preempt_latency_stop(int val) { }
 #endif
-
-/*
- * The time_slice is only refilled when it is empty and that is when we set a
- * new deadline.
- */
-static void time_slice_expired(struct task_struct *p, struct rq *rq)
-{
-	p->time_slice = timeslice();
-
-	if (unlikely(task_has_rt_policy(p)))
-		return;
-	if (p->policy == SCHED_NORMAL) {
-		p->deadline /= 2;
-		p->deadline += (rq->clock + task_deadline_diff(p)) / 2;
-	} else
-		p->deadline = rq->clock + task_deadline_diff(p);
-
-	update_task_priodl(p);
-}
 
 /*
  * Timeslices below RESCHED_US are considered as good as expired as there's no
