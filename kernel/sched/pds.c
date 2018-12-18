@@ -2875,6 +2875,10 @@ static inline void pds_sg_balance_check(const struct rq *rq)
 	cpumask_t chk;
 	int i;
 
+	/* Only online cpu will do sg balance checking */
+	if (unlikely(!rq->online))
+		return;
+
 	/* Only cpu in slibing idle group will do the checking */
 	if (!cpumask_test_cpu(cpu_of(rq), &sched_cpu_sg_idle_mask))
 		return;
