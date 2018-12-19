@@ -26,8 +26,8 @@
 
 #define MAX_RT_PRIO		((MAX_USER_RT_PRIO) + 1)
 
-#define NORMAL_PRIO		(MAX_USER_RT_PRIO)
-#define IDLE_PRIO		((MAX_USER_RT_PRIO) + 1)
+#define NORMAL_PRIO		(MAX_RT_PRIO)
+#define IDLE_PRIO		((MAX_RT_PRIO) + 1)
 #define PRIO_LIMIT		((IDLE_PRIO) + 1)
 #else /* !CONFIG_SCHED_PDS */
 #define MAX_RT_PRIO		MAX_USER_RT_PRIO
