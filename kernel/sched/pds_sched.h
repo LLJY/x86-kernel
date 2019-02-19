@@ -30,7 +30,6 @@
 #include <linux/proc_fs.h>
 #include <linux/psi.h>
 #include <linux/slab.h>
-#include <linux/stackprotector.h>
 #include <linux/stop_machine.h>
 #include <linux/suspend.h>
 #include <linux/swait.h>
