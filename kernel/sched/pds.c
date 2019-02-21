@@ -2186,7 +2186,7 @@ int sched_fork(unsigned long __maybe_unused clone_flags, struct task_struct *p)
 	rq->curr->time_slice /= 2;
 	p->time_slice = rq->curr->time_slice;
 #ifdef CONFIG_SCHED_HRTICK
-	hrtick_start(rq, rq->curr->time_slice);
+	hrtick_start(rq, US_TO_NS(rq->curr->time_slice));
 #endif
 
 	if (p->time_slice < RESCHED_US) {
