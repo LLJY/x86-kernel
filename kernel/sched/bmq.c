@@ -84,8 +84,7 @@ static inline void print_scheduler_version(void)
 /**
  * sched_yield_type - Choose what sort of yield sched_yield will perform.
  * 0: No yield.
- * 1: Yield only to better priority/deadline tasks. (default)
- * 2: Expire timeslice and recalculate deadline.
+ * 1: Deboost and requeue task. (default)
  */
 int sched_yield_type __read_mostly = 1;
 
@@ -4630,8 +4629,8 @@ static void do_sched_yield(void)
 
 	rq = this_rq_lock_irq(&rf);
 
-	if (sched_yield_type > 1) {
-		current->time_slice = SCHED_TIMESLICE_NS;
+	if (rt_task(current)) {
+		current->boost_prio = MAX_PRIORITY_ADJ;
 		requeue_task(current, rq);
 	}
 	schedstat_inc(rq->yld_count);
