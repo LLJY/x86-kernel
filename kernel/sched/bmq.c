@@ -3150,7 +3150,9 @@ static void __sched notrace __schedule(bool preempt)
 			prev->state = TASK_RUNNING;
 		} else {
 			prev->ts_deboost |= ts_over_run(rq);
-			if (prev->ts_deboost)
+			if ((SCHED_NORMAL == prev->policy && prev->ts_deboost) ||
+			    SCHED_BATCH == prev->policy ||
+			    SCHED_IDLE == prev->policy)
 				deboost_task(prev, 1);
 			deactivate_task(prev, rq);
 
