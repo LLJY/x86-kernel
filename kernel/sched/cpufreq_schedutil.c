@@ -916,6 +916,7 @@ static int __init sugov_register(void)
 fs_initcall(sugov_register);
 
 #ifdef CONFIG_ENERGY_MODEL
+#ifndef CONFIG_SCHED_PDS
 extern bool sched_energy_update;
 extern struct mutex sched_energy_mutex;
 
@@ -946,4 +947,10 @@ void sched_cpufreq_governor_change(struct cpufreq_policy *policy,
 	}
 
 }
+#else /* CONFIG_SCHED_PDS */
+void sched_cpufreq_governor_change(struct cpufreq_policy *policy,
+				  struct cpufreq_governor *old_gov)
+{
+}
+#endif
 #endif
