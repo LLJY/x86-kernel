@@ -23,6 +23,7 @@
 
 #include <linux/cpufreq.h>
 #include <linux/cpuidle.h>
+#include <linux/cpuset.h>
 #include <linux/ctype.h>
 #include <linux/kthread.h>
 #include <linux/livepatch.h>

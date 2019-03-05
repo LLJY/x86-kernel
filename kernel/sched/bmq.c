@@ -18,7 +18,6 @@
 #include <linux/context_tracking.h>
 #include <linux/compat.h>
 #include <linux/blkdev.h>
-#include <linux/cpuset.h>
 #include <linux/delayacct.h>
 #include <linux/freezer.h>
 #include <linux/init_task.h>
