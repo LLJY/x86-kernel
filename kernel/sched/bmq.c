@@ -75,7 +75,7 @@ enum {
 
 static inline void print_scheduler_version(void)
 {
-	printk(KERN_INFO "bmq: BMQ CPU Scheduler 0.87 by Alfred Chen.\n");
+	printk(KERN_INFO "bmq: BMQ CPU Scheduler 0.88 by Alfred Chen.\n");
 }
 
 #define SCHED_TIMESLICE_NS	MS_TO_NS(CONFIG_SCHED_TIMESLICE)
