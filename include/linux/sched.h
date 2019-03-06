@@ -1235,24 +1235,12 @@ struct task_struct {
 };
 
 #ifdef CONFIG_SCHED_BMQ
-void cpu_scaling(int cpu);
-void cpu_nonscaling(int cpu);
 #define tsk_seruntime(t)		((t)->sched_time)
 /* replace the uncertian rt_timeout with 0UL */
 #define tsk_rttimeout(t)		(0UL)
 #else /* CFS */
-extern int runqueue_is_locked(int cpu);
-static inline void cpu_scaling(int cpu)
-{
-}
-
-static inline void cpu_nonscaling(int cpu)
-{
-}
 #define tsk_seruntime(t)	((t)->se.sum_exec_runtime)
 #define tsk_rttimeout(t)	((t)->rt.timeout)
-
-#define iso_task(p)		(false)
 #endif /* !CONFIG_SCHED_BMQ */
 
 static inline struct pid *task_pid(struct task_struct *task)
