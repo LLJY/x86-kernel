@@ -1,0 +1,53 @@
+                         BitMap queue CPU Scheduler
+                         --------------------------
+
+CONTENT
+========
+
+ Background
+ Design
+   Overview
+   Task policy
+   Priority management
+   BitMap Queue
+   CPU Assignment and Migration
+
+
+Background
+==========
+
+BitMap Queue CPU scheduler, referred to as BMQ from here on, is an evolution
+of previous Priority and Deadline based Skiplist multiple queue scheduler(PDS),
+and inspired by Zircon scheduler. The goal of it is to keep the scheduler code
+simple, while efficiency and scalable for interactive tasks, such as desktop,
+movie playback and gaming etc.
+
+Design
+======
+
+Overview
+--------
+
+BMQ use per CPU run queue design, each CPU(logical) has it's own run queue,
+each CPU is responsible for scheduling the tasks that are putting into it's
+run queue.
+
+The run queue is a set of priority queues. Note that these queues are fifo
+queue for non-rt tasks or priority queue for rt tasks in data structure. See
+BitMap Queue below for details. BMQ is optimized for non-rt tasks in the fact
+that most applications are non-rt tasks. No matter the queue is fifo or
+priority, In each queue is an ordered list of runnable tasks awaiting execution
+and the data structures are the same. When it is time for a new task to run,
+the scheduler simply looks the lowest numbered queueue that contains a task,
+and runs the first task from the head of that queue. And per CPU idle task is
+also in the run queue, so the scheduler can always find a task to run on from
+its run queue.
+
+Each task will assigned the same timeslice(default 4ms) when it is picked to
+start running. Task will be reinserted at the end of the appropriate priority
+queue when it uses its whole timeslice. However if it has some of its timeslice
+remaining from a previous run, it will be inserted at the head of the priority
+queue so it will be able to resume as quickly as possible.
+
+
+To be continued...
