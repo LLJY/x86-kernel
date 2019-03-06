@@ -233,11 +233,7 @@ static inline void
 bmq_insert(struct task_struct *p, struct rq *rq, int insert_head)
 {
 	p->bmq_idx = task_sched_prio(p);
-	/*
-	if (insert_head)
-		list_add(&p->bmq_node, &rq->queue.heads[p->bmq_idx]);
-	else*/
-		bmq_add_task(p, &rq->queue, p->bmq_idx);
+	bmq_add_task(p, &rq->queue, p->bmq_idx);
 	set_bit(p->bmq_idx, &rq->queue.bitmap[0]);
 	update_sched_rq_watermark(rq);
 }
