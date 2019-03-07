@@ -49,17 +49,10 @@
 
 #define STOP_PRIO		(MAX_RT_PRIO - 1)
 
-/*
- * Some helpers for converting to/from various scales. Use shifts to get
- * approximate multiples of ten for less overhead.
- */
-#define MS_TO_NS(TIME)		((TIME) << 20)
-#define NS_TO_US(TIME)		((TIME) >> 10)
-#define US_TO_NS(TIME)		((TIME) << 10)
+#define SCHED_TIMESLICE_NS	(CONFIG_SCHED_TIMESLICE * 1000 * 1000)
 
-#define RESCHED_NS	US_TO_NS(100) /* Reschedule if less than this many μs left */
-
-#define SCHED_TIMESLICE_NS	MS_TO_NS(CONFIG_SCHED_TIMESLICE)
+/* Reschedule if less than this many μs left */
+#define RESCHED_NS		(100 * 1000)
 
 static inline void print_scheduler_version(void)
 {
@@ -2458,7 +2451,7 @@ static inline void update_curr(struct rq *rq, struct task_struct *p)
 	account_group_exec_runtime(p, ns);
 
 	/* time_slice accounting is done in usecs to avoid overflow on 32bit */
-	p->time_slice -= NS_TO_US(ns);
+	p->time_slice -= ns;
 	p->last_ran = rq->clock_task;
 }
 
