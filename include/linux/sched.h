@@ -615,11 +615,11 @@ struct task_struct {
 	/* Current CPU: */
 	unsigned int			cpu;
 #endif
+#ifndef CONFIG_SCHED_BMQ
 	unsigned int			wakee_flips;
 	unsigned long			wakee_flip_decay_ts;
 	struct task_struct		*last_wakee;
 
-#ifndef CONFIG_SCHED_BMQ
 	/*
 	 * recent_used_cpu is initially set as the last CPU used by a task
 	 * that wakes affine another task. Waker/wakee relationships can
@@ -628,8 +628,8 @@ struct task_struct {
 	 * used CPU that may be idle.
 	 */
 	int				recent_used_cpu;
-#endif /* CONFIG_SCHED_BMQ */
 	int				wake_cpu;
+#endif /* !CONFIG_SCHED_BMQ */
 #endif
 	int				on_rq;
 
