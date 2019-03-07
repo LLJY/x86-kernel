@@ -121,7 +121,6 @@ struct rq {
 	u64 clock, last_tick;
 	u64 last_ts_switch;
 	u64 clock_task;
-	u64 dither;
 
 	unsigned long nr_running;
 	unsigned long nr_uninterruptible;
