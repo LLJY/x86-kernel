@@ -53,7 +53,6 @@
  * Some helpers for converting to/from various scales. Use shifts to get
  * approximate multiples of ten for less overhead.
  */
-#define HALF_JIFFY_NS		(1000000000 / HZ / 2)
 #define MS_TO_NS(TIME)		((TIME) << 20)
 #define MS_TO_US(TIME)		((TIME) << 10)
 #define NS_TO_MS(TIME)		((TIME) >> 20)
@@ -871,15 +870,6 @@ static void hrtick_rq_init(struct rq *rq)
 	hrtimer_init(&rq->hrtick_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	rq->hrtick_timer.function = hrtick;
 }
-
-static inline u64 rq_dither(struct rq *rq)
-{
-	if ((rq->clock - rq->last_tick > HALF_JIFFY_NS) || hrtick_enabled(rq))
-		return 0;
-
-	return HALF_JIFFY_NS;
-}
-
 #else	/* CONFIG_SCHED_HRTICK */
 static inline int hrtick_enabled(struct rq *rq)
 {
@@ -892,11 +882,6 @@ static inline void hrtick_clear(struct rq *rq)
 
 static inline void hrtick_rq_init(struct rq *rq)
 {
-}
-
-static inline u64 rq_dither(struct rq *rq)
-{
-	return (rq->clock - rq->last_tick > HALF_JIFFY_NS)? 0:HALF_JIFFY_NS;
 }
 #endif	/* CONFIG_SCHED_HRTICK */
 
@@ -2564,18 +2549,11 @@ static inline void scheduler_task_tick(struct rq *rq)
 	cpufreq_update_util(rq, 0);
 
 	/*
-	 * Tasks that were scheduled in the first half of a tick are not
-	 * allowed to run into the 2nd half of the next tick if they will
-	 * run out of time slice in the interim. Otherwise, if they have
-	 * less than RESCHED_NS of time slice left they will be rescheduled.
+	 * Tasks have less than RESCHED_NS of time slice left they will be
+	 * rescheduled.
 	 */
-	if (p->time_slice - rq->dither >= RESCHED_NS)
+	if (p->time_slice >= RESCHED_NS)
 		return;
-
-	/**
-	 * p->time_slice < RESCHED_NS. We will modify task_struct under
-	 * rq lock as p is rq->curr
-	 */
 	__set_tsk_resched(p);
 }
 
@@ -3065,8 +3043,6 @@ static inline void set_rq_task(struct rq *rq, struct task_struct *p)
 	if (p != rq->idle)
 		hrtick_start(rq, p->time_slice);
 #endif
-	/* update rq->dither */
-	rq->dither = rq_dither(rq);
 }
 
 /*
@@ -5773,7 +5749,6 @@ void __init sched_init(void)
 		rq->watermark = IDLE_WM;
 
 		raw_spin_lock_init(&rq->lock);
-		rq->dither = 0;
 		rq->nr_running = rq->nr_uninterruptible = 0;
 		rq->calc_load_active = 0;
 		rq->calc_load_update = jiffies + LOAD_FREQ;
