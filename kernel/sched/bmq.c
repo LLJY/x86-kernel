@@ -54,30 +54,17 @@
  * approximate multiples of ten for less overhead.
  */
 #define MS_TO_NS(TIME)		((TIME) << 20)
-#define MS_TO_US(TIME)		((TIME) << 10)
-#define NS_TO_MS(TIME)		((TIME) >> 20)
 #define NS_TO_US(TIME)		((TIME) >> 10)
 #define US_TO_NS(TIME)		((TIME) << 10)
 
 #define RESCHED_NS	US_TO_NS(100) /* Reschedule if less than this many μs left */
 
-enum {
-	BASE_CPU_AFFINITY_CHK_LEVEL = 1,
-#ifdef CONFIG_SCHED_SMT
-	SMT_CPU_AFFINITY_CHK_LEVEL_SPACE_HOLDER,
-#endif
-#ifdef CONFIG_SCHED_MC
-	MC_CPU_AFFINITY_CHK_LEVEL_SPACE_HOLDER,
-#endif
-	NR_CPU_AFFINITY_CHK_LEVEL
-};
+#define SCHED_TIMESLICE_NS	MS_TO_NS(CONFIG_SCHED_TIMESLICE)
 
 static inline void print_scheduler_version(void)
 {
 	printk(KERN_INFO "bmq: BMQ CPU Scheduler 0.88 by Alfred Chen.\n");
 }
-
-#define SCHED_TIMESLICE_NS	MS_TO_NS(CONFIG_SCHED_TIMESLICE)
 
 /**
  * sched_yield_type - Choose what sort of yield sched_yield will perform.
@@ -93,6 +80,17 @@ static inline int ts_over_run(struct rq *rq)
 
 #ifdef CONFIG_SMP
 static cpumask_t sched_rq_pending_mask ____cacheline_aligned_in_smp;
+
+enum {
+	BASE_CPU_AFFINITY_CHK_LEVEL = 1,
+#ifdef CONFIG_SCHED_SMT
+	SMT_CPU_AFFINITY_CHK_LEVEL_SPACE_HOLDER,
+#endif
+#ifdef CONFIG_SCHED_MC
+	MC_CPU_AFFINITY_CHK_LEVEL_SPACE_HOLDER,
+#endif
+	NR_CPU_AFFINITY_CHK_LEVEL
+};
 
 DEFINE_PER_CPU(cpumask_t [NR_CPU_AFFINITY_CHK_LEVEL], sched_cpu_affinity_chk_masks);
 DEFINE_PER_CPU(cpumask_t *, sched_cpu_llc_start_mask);
@@ -203,12 +201,16 @@ static inline void bmq_init_idle(struct bmq *q, struct task_struct *idle)
 	set_bit(IDLE_TASK_SCHED_PRIO, &q->bitmap[0]);
 }
 
-static inline void
-list_add_task_by_prio(struct task_struct *p, struct list_head *head)
+static inline void bmq_add_task(struct task_struct *p, struct bmq *q, int idx)
 {
 	struct list_head *n;
 
-	list_for_each(n, head) {
+	if (likely(idx)) {
+		list_add_tail(&p->bmq_node, &q->heads[idx]);
+		return;
+	}
+
+	list_for_each(n, &q->heads[idx]) {
 		struct task_struct *t;
 
 		t = list_entry(n, struct task_struct, bmq_node);
@@ -217,66 +219,6 @@ list_add_task_by_prio(struct task_struct *p, struct list_head *head)
 	}
 
 	__list_add(&p->bmq_node, n->prev, n);
-}
-
-static inline void
-bmq_add_task(struct task_struct *p, struct bmq *q, int idx)
-{
-	if (likely(idx))
-		list_add_tail(&p->bmq_node, &q->heads[idx]);
-	else
-		list_add_task_by_prio(p, &q->heads[idx]);
-}
-
-static inline void
-bmq_insert(struct task_struct *p, struct rq *rq, int insert_head)
-{
-	p->bmq_idx = task_sched_prio(p);
-	bmq_add_task(p, &rq->queue, p->bmq_idx);
-	set_bit(p->bmq_idx, &rq->queue.bitmap[0]);
-	update_sched_rq_watermark(rq);
-}
-
-static inline void bmq_delete(struct task_struct *p, struct rq *rq)
-{
-	list_del(&p->bmq_node);
-	if (list_empty(&rq->queue.heads[p->bmq_idx])) {
-		clear_bit(p->bmq_idx, &rq->queue.bitmap[0]);
-		update_sched_rq_watermark(rq);
-	}
-}
-
-static inline void bmq_requeue_tail(struct task_struct *p, struct rq *rq)
-{
-	int idx = task_sched_prio(p);
-
-	list_del(&p->bmq_node);
-	bmq_add_task(p, &rq->queue, idx);
-	if (idx != p->bmq_idx) {
-		if (list_empty(&rq->queue.heads[p->bmq_idx]))
-			clear_bit(p->bmq_idx, &rq->queue.bitmap[0]);
-		p->bmq_idx = idx;
-		set_bit(p->bmq_idx, &rq->queue.bitmap[0]);
-		update_sched_rq_watermark(rq);
-	}
-}
-
-static inline int bmq_requeue_tail_lazy(struct task_struct *p, struct rq *rq)
-{
-	int idx = task_sched_prio(p);
-
-	if (idx == p->bmq_idx)
-		return 0;
-
-	list_del(&p->bmq_node);
-	bmq_add_task(p, &rq->queue, idx);
-	if (list_empty(&rq->queue.heads[p->bmq_idx]))
-		clear_bit(p->bmq_idx, &rq->queue.bitmap[0]);
-	p->bmq_idx = idx;
-	set_bit(p->bmq_idx, &rq->queue.bitmap[0]);
-	update_sched_rq_watermark(rq);
-
-	return 1;
 }
 
 /*
@@ -637,7 +579,11 @@ static inline void dequeue_task(struct task_struct *p, struct rq *rq, int flags)
 	WARN_ONCE(task_rq(p) != rq, "bmq: dequeue task reside on cpu%d from cpu%d\n",
 		  task_cpu(p), cpu_of(rq));
 
-	bmq_delete(p, rq);
+	list_del(&p->bmq_node);
+	if (list_empty(&rq->queue.heads[p->bmq_idx])) {
+		clear_bit(p->bmq_idx, &rq->queue.bitmap[0]);
+		update_sched_rq_watermark(rq);
+	}
 	if (1 == --rq->nr_running)
 		cpumask_clear_cpu(cpu_of(rq), &sched_rq_pending_mask);
 
@@ -659,7 +605,10 @@ static inline void enqueue_task(struct task_struct *p, struct rq *rq, int flags)
 	WARN_ONCE(task_rq(p) != rq, "bmq: enqueue task reside on cpu%d to cpu%d\n",
 		  task_cpu(p), cpu_of(rq));
 
-	bmq_insert(p, rq, flags);
+	p->bmq_idx = task_sched_prio(p);
+	bmq_add_task(p, &rq->queue, p->bmq_idx);
+	set_bit(p->bmq_idx, &rq->queue.bitmap[0]);
+	update_sched_rq_watermark(rq);
 	if (2 == ++rq->nr_running)
 		cpumask_set_cpu(cpu_of(rq), &sched_rq_pending_mask);
 
@@ -679,23 +628,43 @@ static inline void enqueue_task(struct task_struct *p, struct rq *rq, int flags)
 
 static inline void requeue_task(struct task_struct *p, struct rq *rq)
 {
+	int idx = task_sched_prio(p);
 
 	lockdep_assert_held(&rq->lock);
-
 	WARN_ONCE(task_rq(p) != rq, "bmq: cpu[%d] requeue task reside on cpu%d\n",
 		  cpu_of(rq), task_cpu(p));
 
-	bmq_requeue_tail(p, rq);
+	list_del(&p->bmq_node);
+	bmq_add_task(p, &rq->queue, idx);
+	if (idx != p->bmq_idx) {
+		if (list_empty(&rq->queue.heads[p->bmq_idx]))
+			clear_bit(p->bmq_idx, &rq->queue.bitmap[0]);
+		p->bmq_idx = idx;
+		set_bit(p->bmq_idx, &rq->queue.bitmap[0]);
+		update_sched_rq_watermark(rq);
+	}
 }
 
 static inline int requeue_task_lazy(struct task_struct *p, struct rq *rq)
 {
-	lockdep_assert_held(&rq->lock);
+	int idx = task_sched_prio(p);
 
+	lockdep_assert_held(&rq->lock);
 	WARN_ONCE(task_rq(p) != rq, "bmq: cpu[%d] requeue task lazy reside on cpu%d\n",
 		  cpu_of(rq), task_cpu(p));
 
-	return bmq_requeue_tail_lazy(p, rq);
+	if (idx == p->bmq_idx)
+		return 0;
+
+	list_del(&p->bmq_node);
+	bmq_add_task(p, &rq->queue, idx);
+	if (list_empty(&rq->queue.heads[p->bmq_idx]))
+		clear_bit(p->bmq_idx, &rq->queue.bitmap[0]);
+	p->bmq_idx = idx;
+	set_bit(p->bmq_idx, &rq->queue.bitmap[0]);
+	update_sched_rq_watermark(rq);
+
+	return 1;
 }
 
 /*
