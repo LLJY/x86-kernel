@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * Copyright (C) 2015-2018 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
+ * Copyright (C) 2015-2019 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
  */
 
 #include "queueing.h"
@@ -85,7 +85,7 @@ static int prepare_skb_header(struct sk_buff *skb, struct wg_device *wg)
 		return -EINVAL;
 	skb_pull(skb, data_offset);
 	if (unlikely(skb->len != data_len))
-		 /* Final len does not agree with calculated len */
+		/* Final len does not agree with calculated len */
 		return -EINVAL;
 	header_len = validate_header_len(skb);
 	if (unlikely(!header_len))
@@ -179,7 +179,7 @@ static void wg_receive_handshake_packet(struct wg_device *wg,
 				    wg->dev->name, peer->internal_id,
 				    &peer->endpoint.addr);
 		if (wg_noise_handshake_begin_session(&peer->handshake,
-						  &peer->keypairs)) {
+						     &peer->keypairs)) {
 			wg_timers_session_derived(peer);
 			wg_timers_handshake_complete(peer);
 			/* Calling this function will either send any existing
@@ -538,7 +538,7 @@ static void wg_packet_consume_data(struct wg_device *wg, struct sk_buff *skb)
 	rcu_read_lock_bh();
 	PACKET_CB(skb)->keypair =
 		(struct noise_keypair *)wg_index_hashtable_lookup(
-			&wg->index_hashtable, INDEX_HASHTABLE_KEYPAIR, idx,
+			wg->index_hashtable, INDEX_HASHTABLE_KEYPAIR, idx,
 			&peer);
 	if (unlikely(!wg_noise_keypair_get(PACKET_CB(skb)->keypair)))
 		goto err_keypair;
