@@ -3613,7 +3613,9 @@ SYSCALL_DEFINE1(nice, int, increment)
  */
 int task_prio(const struct task_struct *p)
 {
-	return (p->prio - MAX_RT_PRIO);
+	if (p->prio < MAX_RT_PRIO)
+		return (p->prio - MAX_RT_PRIO);
+	return (p->prio - MAX_RT_PRIO + p->boost_prio);
 }
 
 /**
@@ -4820,10 +4822,6 @@ static int sched_rr_get_interval(pid_t pid, struct timespec64 *t)
 	p = find_process_by_pid(pid);
 	if (!p)
 		goto out_unlock;
-
-	printk(KERN_INFO "bmq: %d - p:%d n:%d s:%d b:%d\n",
-	       p->pid, p->prio, p->normal_prio,
-	       p->static_prio, p->boost_prio);
 
 	retval = security_task_getscheduler(p);
 	if (retval)
