@@ -2958,10 +2958,8 @@ choose_next_task(struct rq *rq, int cpu, struct task_struct *prev)
 
 #ifdef	CONFIG_SMP
 	if (likely(rq->online))
-		if (take_other_rq_tasks(rq, cpu, TASK_SCHED_WATERMARK(next))) {
-			resched_curr(rq);
+		if (take_other_rq_tasks(rq, cpu, TASK_SCHED_WATERMARK(next)))
 			return rq_first_bmq_task(rq);
-		}
 #endif
 	return next;
 }
