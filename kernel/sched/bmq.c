@@ -606,7 +606,9 @@ static inline void dequeue_task(struct task_struct *p, struct rq *rq, int flags)
 		update_sched_rq_watermark(rq);
 	}
 	if (1 == --rq->nr_running)
+#ifdef CONFIG_SMP
 		cpumask_clear_cpu(cpu_of(rq), &sched_rq_pending_mask);
+#endif
 
 	sched_update_tick_dependency(rq);
 	psi_dequeue(p, flags & DEQUEUE_SLEEP);
@@ -631,7 +633,9 @@ static inline void enqueue_task(struct task_struct *p, struct rq *rq, int flags)
 	set_bit(p->bmq_idx, rq->queue.bitmap);
 	update_sched_rq_watermark(rq);
 	if (2 == ++rq->nr_running)
+#ifdef CONFIG_SMP
 		cpumask_set_cpu(cpu_of(rq), &sched_rq_pending_mask);
+#endif
 
 	sched_update_tick_dependency(rq);
 
