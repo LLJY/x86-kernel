@@ -2921,32 +2921,25 @@ lock_and_migrate_pending_tasks(struct rq *src_rq, struct rq *rq)
 	return nr_migrated;
 }
 
-static inline int
-take_other_rq_tasks(struct rq *rq, int cpu, unsigned long watermark)
+static inline int take_other_rq_tasks(struct rq *rq, int cpu)
 {
-	struct cpumask *affinity_mask, *end;
-	struct cpumask chk;
-
-	if (watermark > IDLE_WM)
-		return 0;
+	struct cpumask *affinity_mask;
+	struct cpumask chk, tmp;
+	int i, tried;
 
 	if (!cpumask_and(&chk, &sched_rq_pending_mask, cpu_online_mask))
 		return 0;
 
+	tried = 0;
 	affinity_mask = per_cpu(sched_cpu_llc_start_mask, cpu);
-	end = per_cpu(sched_cpu_affinity_chk_end_masks, cpu);
-	do {
-		struct cpumask tmp;
-		int i;
-
-		if (unlikely(!cpumask_and(&tmp, &chk, affinity_mask)))
-			continue;
-
-		for_each_cpu_wrap(i, &tmp, cpu)
+	while (cpumask_and(&tmp, &chk, affinity_mask++))
+		for_each_cpu_wrap(i, &tmp, cpu) {
 			if (lock_and_migrate_pending_tasks(cpu_rq(i), rq))
 				return 1;
-	} while (++affinity_mask < end);
-
+			if (tried)
+				return 0;
+			tried++;
+		}
 	return 0;
 }
 #endif
@@ -2958,7 +2951,7 @@ choose_next_task(struct rq *rq, int cpu, struct task_struct *prev)
 
 #ifdef	CONFIG_SMP
 	if (likely(rq->online))
-		if (take_other_rq_tasks(rq, cpu, TASK_SCHED_WATERMARK(next)))
+		if (next == rq->idle && take_other_rq_tasks(rq, cpu))
 			return rq_first_bmq_task(rq);
 #endif
 	return next;
