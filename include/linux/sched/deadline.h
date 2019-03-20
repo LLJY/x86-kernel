@@ -11,7 +11,7 @@ static inline int dl_prio(int prio)
 
 static inline int dl_task(struct task_struct *p)
 {
-	return 0;
+	return (SCHED_NORMAL == p->policy);
 }
 #else
 
