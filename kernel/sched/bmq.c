@@ -133,8 +133,6 @@ int __weak arch_sd_sibling_asym_packing(void)
 {
        return 0*SD_ASYM_PACKING;
 }
-#else
-struct rq *uprq;
 #endif /* CONFIG_SMP */
 
 static DEFINE_MUTEX(sched_hotcpu_mutex);
@@ -5717,8 +5715,6 @@ void __init sched_init(void)
 #ifdef CONFIG_SMP
 	cpumask_copy(&sched_rq_watermark[1], cpu_present_mask);
 	set_bit(1, sched_rq_watermark_bitmap);
-#else
-	uprq = &per_cpu(runqueues, 0);
 #endif
 
 #ifdef CONFIG_CGROUP_SCHED
