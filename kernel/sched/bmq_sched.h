@@ -164,21 +164,14 @@ extern atomic_long_t calc_load_tasks;
 extern void calc_global_load_tick(struct rq *this_rq);
 extern long calc_load_fold_active(struct rq *this_rq, long adjust);
 
-#ifndef CONFIG_SMP
-extern struct rq *uprq;
-#define cpu_rq(cpu)	(uprq)
-#define this_rq()	(uprq)
-#define raw_rq()	(uprq)
-#define task_rq(p)	(uprq)
-#define cpu_curr(cpu)	((uprq)->curr)
-#else /* CONFIG_SMP */
 DECLARE_PER_CPU_SHARED_ALIGNED(struct rq, runqueues);
 #define cpu_rq(cpu)		(&per_cpu(runqueues, (cpu)))
 #define this_rq()		this_cpu_ptr(&runqueues)
-#define raw_rq()		raw_cpu_ptr(&runqueues)
 #define task_rq(p)		cpu_rq(task_cpu(p))
 #define cpu_curr(cpu)		(cpu_rq(cpu)->curr)
+#define raw_rq()		raw_cpu_ptr(&runqueues)
 
+#ifdef CONFIG_SMP
 #if defined(CONFIG_SCHED_DEBUG) && defined(CONFIG_SYSCTL)
 void register_sched_domain_sysctl(void);
 void unregister_sched_domain_sysctl(void);
@@ -190,14 +183,13 @@ static inline void unregister_sched_domain_sysctl(void)
 {
 }
 #endif
-
 #endif /* CONFIG_SMP */
 
 #ifndef arch_scale_freq_capacity
 static __always_inline
 unsigned long arch_scale_freq_capacity(int cpu)
 {
-		return SCHED_CAPACITY_SCALE;
+	return SCHED_CAPACITY_SCALE;
 }
 #endif
 
