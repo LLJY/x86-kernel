@@ -49,7 +49,7 @@ enum {
     CARD_ON = 1,
 };
 
-static int load_state = CARD_UNCHANGED;
+static int load_state = CARD_OFF;
 MODULE_PARM_DESC(load_state, "Initial card state (0 = off, 1 = on, -1 = unchanged)");
 module_param(load_state, int, 0400);
 static int unload_state = CARD_UNCHANGED;
