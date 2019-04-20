@@ -1845,6 +1845,10 @@ int sched_fork(unsigned long __maybe_unused clone_flags, struct task_struct *p)
 	p->stime =
 	p->sched_time = 0;
 
+#ifdef CONFIG_COMPACTION
+	p->capture_control = NULL;
+#endif
+
 	/*
 	 * We mark the process as NEW here. This guarantees that
 	 * nobody will actually run it, and a signal or other external
