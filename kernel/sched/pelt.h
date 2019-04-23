@@ -45,7 +45,6 @@ static inline void cfs_se_util_change(struct sched_avg *avg)
 	enqueued &= ~UTIL_AVG_UNCHANGED;
 	WRITE_ONCE(avg->util_est.enqueued, enqueued);
 }
-#endif
 
 /*
  * The clock_pelt scales the time to reflect the effective amount of
@@ -141,6 +140,7 @@ static inline u64 cfs_rq_clock_pelt(struct cfs_rq *cfs_rq)
 	return rq_clock_pelt(rq_of(cfs_rq));
 }
 #endif
+#endif /* CONFIG_SCHED_BMQ */
 
 #else
 
