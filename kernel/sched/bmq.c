@@ -3743,7 +3743,6 @@ static int __set_cpus_allowed_ptr(struct task_struct *p,
 		__task_access_unlock(p, lock);
 		raw_spin_unlock_irqrestore(&p->pi_lock, flags);
 		stop_one_cpu(cpu_of(rq), migration_cpu_stop, &arg);
-		tlb_migrate_finish(p->mm);
 		return 0;
 	}
 	if (task_on_rq_queued(p)) {
