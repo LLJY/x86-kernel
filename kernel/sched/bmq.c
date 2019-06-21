@@ -1439,11 +1439,6 @@ ttwu_stat(struct task_struct *p, int cpu, int wake_flags)
 	__schedstat_inc(rq->ttwu_count);
 }
 
-static inline void ttwu_activate(struct task_struct *p, struct rq *rq)
-{
-	activate_task(p, rq);
-}
-
 /*
  * Mark the task runnable and perform wakeup-preemption.
  */
@@ -1462,7 +1457,7 @@ ttwu_do_activate(struct rq *rq, struct task_struct *p, int wake_flags)
 		rq->nr_uninterruptible--;
 #endif
 
-	ttwu_activate(p, rq);
+	activate_task(p, rq);
 	ttwu_do_wakeup(rq, p, 0);
 }
 
