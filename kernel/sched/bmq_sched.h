@@ -21,6 +21,7 @@
 
 #include <uapi/linux/sched/types.h>
 
+#include <linux/cgroup.h>
 #include <linux/cpufreq.h>
 #include <linux/cpuidle.h>
 #include <linux/cpuset.h>
