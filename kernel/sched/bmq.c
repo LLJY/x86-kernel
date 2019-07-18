@@ -1461,6 +1461,17 @@ ttwu_do_activate(struct rq *rq, struct task_struct *p, int wake_flags)
 	ttwu_do_wakeup(rq, p, 0);
 }
 
+static inline void ttwu_queue(struct task_struct *p, int cpu, int wake_flags)
+{
+	struct rq *rq = cpu_rq(cpu);
+
+	raw_spin_lock(&rq->lock);
+	update_rq_clock(rq);
+	ttwu_do_activate(rq, p, wake_flags);
+	check_preempt_curr(rq, p);
+	raw_spin_unlock(&rq->lock);
+}
+
 static int ttwu_remote(struct task_struct *p, int wake_flags)
 {
 	struct rq *rq;
@@ -1587,7 +1598,6 @@ static int try_to_wake_up(struct task_struct *p, unsigned int state,
 			  int wake_flags)
 {
 	unsigned long flags;
-	struct rq *rq;
 	int cpu, success = 0;
 
 	/*
@@ -1686,15 +1696,7 @@ static int try_to_wake_up(struct task_struct *p, unsigned int state,
 	}
 #endif
 
-	rq = cpu_rq(cpu);
-	raw_spin_lock(&rq->lock);
-
-	update_rq_clock(rq);
-	ttwu_do_activate(rq, p, wake_flags);
-	check_preempt_curr(rq, p);
-
-	raw_spin_unlock(&rq->lock);
-
+	ttwu_queue(p, cpu, wake_flags);
 stat:
 	ttwu_stat(p, cpu, wake_flags);
 out:
