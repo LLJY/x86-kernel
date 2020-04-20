@@ -6925,6 +6925,8 @@ restart:
 		__fs_reclaim_acquire(_THIS_IP_);
 		if (was_frozen || ret)
 			break;
+		if (ret || kthread_should_stop() ||
+		    !atomic_read(&pgdat->kswapd_waiters))
 
 		/*
 		 * Raise priority if scanning rate is too low or there was no
