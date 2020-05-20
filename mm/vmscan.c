@@ -6926,7 +6926,8 @@ restart:
 		if (was_frozen || ret)
 			break;
 		if (ret || kthread_should_stop() ||
-		    !atomic_read(&pgdat->kswapd_waiters))
+		    !atomic_long_read(&kswapd_waiters))
+			break;
 
 		/*
 		 * Raise priority if scanning rate is too low or there was no
