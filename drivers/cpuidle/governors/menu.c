@@ -16,6 +16,7 @@
 #include <linux/tick.h>
 #include <linux/sched/stat.h>
 #include <linux/math64.h>
+#include <linux/powerbump.h>
 
 #include "gov.h"
 
@@ -224,6 +225,9 @@ static int menu_select(struct cpuidle_driver *drv, struct cpuidle_device *dev,
 		data->needs_update = 0;
 	}
 
+	if (in_power_bump() && latency_req > BUMP_LATENCY_THRESHOLD) 
+		latency_req = BUMP_LATENCY_THRESHOLD;
+	
 	/* Find the shortest expected idle interval. */
 	predicted_ns = get_typical_interval(data) * NSEC_PER_USEC;
 	if (predicted_ns > RESIDENCY_THRESHOLD_NS) {
