@@ -161,6 +161,7 @@
 #include <net/page_pool/helpers.h>
 #include <net/rps.h>
 #include <linux/phy_link_topology.h>
+#include <linux/powerbump.h>
 
 #include "dev.h"
 #include "devmem.h"
@@ -6150,6 +6151,7 @@ int netif_receive_skb(struct sk_buff *skb)
 	int ret;
 
 	trace_netif_receive_skb_entry(skb);
+	give_power_bump(BUMP_FOR_NETWORK);
 
 	ret = netif_receive_skb_internal(skb);
 	trace_netif_receive_skb_exit(ret);
@@ -6174,6 +6176,7 @@ void netif_receive_skb_list(struct list_head *head)
 
 	if (list_empty(head))
 		return;
+	give_power_bump(BUMP_FOR_NETWORK);
 	if (trace_netif_receive_skb_list_entry_enabled()) {
 		list_for_each_entry(skb, head, list)
 			trace_netif_receive_skb_list_entry(skb);
