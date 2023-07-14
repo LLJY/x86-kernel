@@ -375,6 +375,7 @@ static inline void tcp_dec_quickack_mode(struct sock *sk)
 #define	TCP_ECN_QUEUE_CWR	2
 #define	TCP_ECN_DEMAND_CWR	4
 #define	TCP_ECN_SEEN		8
+#define	TCP_ECN_LOW		16
 
 enum tcp_tw_status {
 	TCP_TW_SUCCESS = 0,
@@ -779,6 +780,15 @@ static inline void tcp_fast_path_check(struct sock *sk)
 
 u32 tcp_delack_max(const struct sock *sk);
 
+static inline void tcp_set_ecn_low_from_dst(struct sock *sk,
+					    const struct dst_entry *dst)
+{
+	struct tcp_sock *tp = tcp_sk(sk);
+
+	if (dst_feature(dst, RTAX_FEATURE_ECN_LOW))
+		tp->ecn_flags |= TCP_ECN_LOW;
+}
+
 /* Compute the actual rto_min value */
 static inline u32 tcp_rto_min(const struct sock *sk)
 {
@@ -895,7 +905,7 @@ static inline u64 tcp_skb_timestamp_us(const struct sk_buff *skb)
 	return div_u64(skb->skb_mstamp_ns, NSEC_PER_USEC);
 }
 
-/* Provide skb TSval in usec or ms unit */
+/* Provide skb TSval in usec or ms unit */include/net/tcp.h
 static inline u32 tcp_skb_timestamp_ts(bool usec_ts, const struct sk_buff *skb)
 {
 	if (usec_ts)
