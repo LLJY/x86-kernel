@@ -906,7 +906,7 @@ static inline u64 tcp_skb_timestamp_us(const struct sk_buff *skb)
 	return div_u64(skb->skb_mstamp_ns, NSEC_PER_USEC);
 }
 
-/* Provide skb TSval in usec or ms unit */include/net/tcp.h
+/* Provide skb TSval in usec or ms unit */
 static inline u32 tcp_skb_timestamp_ts(bool usec_ts, const struct sk_buff *skb)
 {
 	if (usec_ts)
@@ -1192,6 +1192,9 @@ struct tcp_congestion_ops {
 
 	/* pick target number of segments per TSO/GSO skb (optional): */
 	u32 (*tso_segs)(struct sock *sk, unsigned int mss_now);
+
+	/* override sysctl_tcp_min_tso_segs */
+	u32 (*min_tso_segs)(struct sock *sk);
 
 	/* react to a specific lost skb (optional) */
 	void (*skb_marked_lost)(struct sock *sk, const struct sk_buff *skb);
