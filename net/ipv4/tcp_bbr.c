@@ -367,8 +367,9 @@ static void bbr_check_probe_rtt_done(struct sock *sk);
  */
 static bool bbr_can_use_ecn(const struct sock *sk)
 {
-	return (tcp_sk(sk)->ecn_flags & TCP_ECN_OK) &&
-	       (tcp_sk(sk)->ecn_flags & TCP_ECN_LOW);
+	const struct tcp_sock *tp = tcp_sk(sk);
+
+	return (tcp_ecn_mode_any(tp)) && (tp->ecn_flags & TCP_ECN_LOW);
 }
 
 /* Do we estimate that STARTUP filled the pipe? */
