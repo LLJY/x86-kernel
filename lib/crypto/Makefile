@@ -255,12 +255,12 @@ clean-files += arm/poly1305-core.S \
 
 ################################################################################
 
-obj-$(CONFIG_CRYPTO_LIB_POLYVAL) += libpolyval.o
-libpolyval-y := polyval.o
-ifeq ($(CONFIG_CRYPTO_LIB_POLYVAL_ARCH),y)
+obj-$(CONFIG_CRYPTO_LIB_GF128HASH) += libgf128hash.o
+libgf128hash-y := polyval.o
+ifeq ($(CONFIG_CRYPTO_LIB_GF128HASH_ARCH),y)
 CFLAGS_polyval.o += -I$(src)/$(SRCARCH)
-libpolyval-$(CONFIG_ARM64) += arm64/polyval-ce-core.o
-libpolyval-$(CONFIG_X86) += x86/polyval-pclmul-avx.o
+libgf128hash-$(CONFIG_ARM64) += arm64/polyval-ce-core.o
+libgf128hash-$(CONFIG_X86) += x86/polyval-pclmul-avx.o
 endif
 
 ################################################################################
